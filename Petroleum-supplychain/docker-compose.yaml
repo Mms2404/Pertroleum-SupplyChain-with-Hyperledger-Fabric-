@@ -1,0 +1,154 @@
+version: '2'
+
+networks:
+  fabric_network:
+
+services:
+
+  orderer.example.com:
+    container_name: orderer.example.com
+    image: hyperledger/fabric-orderer:2.2
+    environment:
+      - ORDERER_GENERAL_LOGLEVEL=info
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+    volumes:
+      - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+      - ./crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp:/var/hyperledger/orderer/msp
+      - ./crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls:/var/hyperledger/orderer/tls
+      - ./orderer-data:/var/hyperledger/production # makes sure channel/ledger/chaincode data survives restarts
+    ports:
+      - 7050:7050
+    networks:
+      - fabric_network
+
+  peer0.org1.example.com:
+    container_name: peer0.org1.example.com
+    image: hyperledger/fabric-peer:2.2
+    environment:
+      - CORE_PEER_ID=peer0.org1.example.com
+      - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org1.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org1.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.example.com:7051
+      - CORE_PEER_LOCALMSPID=Org1MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_EVENTS_ENABLED=true  # without this you will get error (while approving chaincodes): timed out waiting for txid on all peers
+      - CORE_PEER_EVENTS_ADDRESS=0.0.0.0:7053 # to make peer listen the event from port 7053
+      - CORE_PEER_EVENTS_LISTENADDRESS=0.0.0.0:7053 # same as above
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9443  # activates eventing ( proper exposing )
+      - CORE_PEER_TLS_ENABLED=true   # for client TLS handshake 
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock   # impp for all peers
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock  # impp for all peers
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./peer-data/org1:/var/hyperledger/production
+    ports:
+      - 7051:7051
+      - 7053:7053    # for CORE_PEER_EVENTS_ADDRESS
+    networks:
+      - fabric_network
+
+  peer0.org2.example.com:
+    container_name: peer0.org2.example.com
+    image: hyperledger/fabric-peer:2.2
+    environment:
+      - CORE_PEER_ID=peer0.org2.example.com
+      - CORE_PEER_ADDRESS=peer0.org2.example.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org2.example.com:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org2.example.com:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.example.com:8051
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_EVENTS_ENABLED=true
+      - CORE_PEER_EVENTS_ADDRESS=0.0.0.0:8053
+      - CORE_PEER_EVENTS_LISTENADDRESS=0.0.0.0:8053 
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9443
+      - CORE_PEER_TLS_ENABLED=true   # for client TLS handshake
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./peer-data/org2:/var/hyperledger/production
+    ports:
+      - 8051:8051
+      - 8053:8053
+    networks:
+      - fabric_network
+
+  peer0.org3.example.com:
+    container_name: peer0.org3.example.com
+    image: hyperledger/fabric-peer:2.2
+    environment:
+      - CORE_PEER_ID=peer0.org3.example.com
+      - CORE_PEER_ADDRESS=peer0.org3.example.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org3.example.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org3.example.com:9051
+      - CORE_PEER_LOCALMSPID=Org3MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_EVENTS_ENABLED=true
+      - CORE_PEER_EVENTS_ADDRESS=0.0.0.0:9053 
+      - CORE_PEER_EVENTS_LISTENADDRESS=0.0.0.0:9053
+      - CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9443
+      - CORE_PEER_TLS_ENABLED=true   # for client TLS handshake
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock 
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls:/etc/hyperledger/fabric/tls
+      - ./peer-data/org3:/var/hyperledger/production
+    ports:
+      - 9051:9051
+      - 9053:9053
+    networks:
+      - fabric_network
+
+  cli:
+    user: root:1001      # for the docker to join with fabric 
+    container_name: cli
+    image: hyperledger/fabric-tools:2.2
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_VM_ENDPOINT=unix:///host/var/run/docker.sock  # internal Fabric chaincode build process uses this 
+      - CORE_LOGGING_LEVEL=DEBUG
+      - CORE_PEER_ID=cli
+      - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+      - CORE_PEER_LOCALMSPID=Org1MSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+      #- /var/run/:/host/var/run/
+      - /var/run/docker.sock:/host/var/run/docker.sock  # to mount docker socket inside the cli
+      - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/
+      - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - ./setup.sh:/opt/gopath/src/github.com/hyperledger/fabric/peer/setup.sh   # add this ...so that the cli recognizes setup.sh
+      - ./config:/opt/gopath/src/github.com/hyperledger/fabric/peer/config       # add this ... so the cli reocgnizes config folder -> core.yaml file 
+      - ./chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode # so that it recognizes petroleum_1.0.tar.gz
+        
+
+    networks:
+      - fabric_network
+    

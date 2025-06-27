@@ -1,0 +1,29 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+group = 'org.petroleum'
+version = '1.0'
+
+sourceCompatibility = 17
+targetCompatibility = 17
+
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }    // this is required as ,  transitive dependencies of the fabric-chaincode-shim is not available at default Maven Central location 
+}
+
+dependencies {
+    implementation 'org.hyperledger.fabric-chaincode-java:fabric-chaincode-shim:2.2.0'
+    implementation 'com.owlike:genson:1.6'
+}
+
+mainClassName = 'org.petroleum.PetroleumChaincode'
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': mainClassName
+        )
+    }
+}

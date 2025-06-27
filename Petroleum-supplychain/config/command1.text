@@ -1,0 +1,168 @@
+docker-compose down -v
+rm -rf crypto-config channel-artifacts system-genesis-block
+
+cryptogen generate --config=./config/crypto-config.yaml
+
+configtxgen -profile SupplyChainGenesis -channelID system-channel -outputBlock ./channel-artifacts/genesis.block --configPath ./config
+
+
+configtxgen \
+  -profile SupplyChainChannel \
+  -outputCreateChannelTx ./channel-artifacts/supplychannel.tx \
+  -channelID supplychannel \
+  --configPath ./config
+
+
+configtxgen \
+  -profile SupplyChainChannel \
+  -outputAnchorPeersUpdate ./channel-artifacts/Org1Anchors.tx \
+  -channelID supplychannel \
+  -asOrg Org1MSP \
+  --configPath ./config
+
+configtxgen \
+  -profile SupplyChainChannel \
+  -outputAnchorPeersUpdate ./channel-artifacts/Org2Anchors.tx \
+  -channelID supplychannel \
+  -asOrg Org2MSP \
+  --configPath ./config
+
+configtxgen \
+  -profile SupplyChainChannel \
+  -outputAnchorPeersUpdate ./channel-artifacts/Org3Anchors.tx \
+  -channelID supplychannel \
+  -asOrg Org3MSP \
+  --configPath ./config
+
+docker-compose up -d
+
+
+docker exec -it cli bash
+
+export CORE_PEER_LOCALMSPID="Org1MSP"
+export CORE_PEER_MSPCONFIGPATH="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp"
+export CORE_PEER_ADDRESS="peer0.org1.example.com:7051"
+export CORE_PEER_TLS_ROOTCERT_FILE="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
+export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+
+export CORE_PEER_LOCALMSPID="Org2MSP"
+export CORE_PEER_MSPCONFIGPATH="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp"
+export CORE_PEER_ADDRESS="peer0.org2.example.com:8051"
+export CORE_PEER_TLS_ROOTCERT_FILE="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
+export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+
+export CORE_PEER_LOCALMSPID="Org3MSP"
+export CORE_PEER_MSPCONFIGPATH="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp"
+export CORE_PEER_ADDRESS="peer0.org3.example.com:9051"
+export CORE_PEER_TLS_ROOTCERT_FILE="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
+export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+
+
+(common):
+peer channel create \
+  -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel \
+  -f ./channel-artifacts/supplychannel.tx \
+  --outputBlock ./supplychannel.block \
+  --tls --cafile $ORDERER_CA
+
+(eaxh org):
+peer channel join -b ./channel-artifacts/supplychannel.block
+
+
+
+**
+DO UPDATE FOR EACH ORG:
+
+peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org1Anchors.tx \
+  --tls --cafile $ORDERER_CA
+
+peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org2Anchors.tx \
+  --tls --cafile $ORDERER_CA
+
+  peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org3Anchors.tx \
+  --tls --cafile $ORDERER_CA
+
+
+NOW INSTALL , APPROVE AND COMMIT :
+
+ INSTALLING : (each org)
+
+ docker cp petroleum.tar.gz cli:/opt/gopath/src/github.com/
+ docker exec -it cli bash
+ cd /opt/gopath/src/github.com/
+ ls    => check if the chaincode is there 
+ peer lifecycle chaincode install petroleum.tar.gz
+
+ Chaincode code package identifier: petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31
+
+ APPROVING : (each org)
+
+ peer lifecycle chaincode approveformyorg \
+  --orderer orderer.example.com:7050 \
+  --channelID supplychannel \
+  --name petroleum_1 \
+  --version 1.0 \
+  --package-id petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31 \
+  --sequence 1 \
+  --tls --cafile $ORDERER_CA
+
+  [ERROR]: Error: timed out waiting for txid on all peers
+
+  peer lifecycle chaincode approveformyorg \
+  --orderer orderer.example.com:7050 \
+  --channelID supplychannel \
+  --name petroleum_1 \
+  --version 1.0 \
+  --package-id petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31 \
+  --sequence 1 \
+  --tls \
+  --cafile $ORDERER_CA \
+  --waitForEvent
+
+ [ This waits for the peer to actually commit the block and avoids premature timeout.]
+
+  run => nc -vz peer0.org1.example.com 7053 => noting happened =>means peer's event listener not active 
+  so , added one line in docker-compose.yaml and restarted the network (rejoin the peer if needed - fetch cmd)
+
+ peer channel fetch 0 supplychannel.block \
+  -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel \
+  --tls --cafile $ORDERER_CA
+
+But if you have used => docker-compose down -v => all channels , ledger data will be deleted => so start from creating a channel
+
+
+(CHECKING):
+docker exec -it peer0.org1.example.com netstat -tlnp 
+docker exec -it peer0.org2.example.com netstat -tlnp 
+docker exec -it peer0.org3.example.com netstat -tlnp 
+
+
+TIMED OUT ERROR :
+
+peer channel fetch config config_block.pb -o orderer.example.com:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -c supplychannel
+
+configtxlator proto_decode --input config_block.pb --type common.Block | jq '.data.data[0].payload.data.config.channel_group.groups.Application.groups.Org1MSP.policies.Readers.policy.rule'
+
+This should return :
+"OR('Org1MSP.admin', 'Org1MSP.peer', 'Org1MSP.client')"
+
+
+nc -vz peer0.org1.example.com 7053  => this command should return something like this => Connection to peer0.org1.example.com 7053 port [tcp/*] succeeded!
+if it shows nothing:
+      Your peer container does not have port 7053 (event service) exposed properly or it's not bound correctly to the outside world.
+      Without this, the CLI container can’t receive block events, 
+      and chaincode approval with --waitForEvent or default behavior times out, because it’s waiting for confirmation that never comes.
+
+------- checking valid blockchain height -------------
+peer channel getinfo -c supplychannel
+Blockchain info: {"height":1,"currentBlockHash":"8X5ch5fZMRTc6TGgTs1zbrqxQgNEUfviLLt4IyN58lE="}
