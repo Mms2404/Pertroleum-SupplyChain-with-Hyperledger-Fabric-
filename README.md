@@ -1,4 +1,4 @@
-# 🔗 The Beauty of Blockchain in the Petroleum Supply Chain
+# 🔗 Blockchain in the Petroleum Supply Chain
 ---
 ## 🌍 Why Blockchain?
 
