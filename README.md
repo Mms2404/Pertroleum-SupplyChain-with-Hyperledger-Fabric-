@@ -44,7 +44,7 @@ With this Hyperledger Fabric network, you can:
     curl -sSL https://bit.ly/2ysbOFE | bash -s
     ```
     IMP : Ensure you add fabric-samples/bin to your environment path.
-  - Start network : ( In the project directory - cd Petroleum-chaincode )
+  - Start network : ( In the project directory - cd Petroleum-supplychain )
      ``` bash
      wsl
      docker-compose up -d
