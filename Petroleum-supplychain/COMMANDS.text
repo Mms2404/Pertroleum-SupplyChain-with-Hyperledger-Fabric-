@@ -54,62 +54,65 @@
      
      docker-compose -f docker-compose.yaml up -d
 
-10 . Uses Org1’s admin identity to create the channel named supplychannel
+10 . Use each organization's admin identity to create the channel named supplychannel
 
-     docker exec -e "CORE_PEER_LOCALMSPID=Org1MSP" \
-  -e "CORE_PEER_ADDRESS=peer0.org1.example.com:7051" \
-  -e "CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/msp/users/Admin@org1.example.com/msp" \
-  cli \
-  peer channel create \
-    -o orderer.example.com:7050 \
-    -c supplychannel \
-    -f /etc/hyperledger/configtx/channel-artifacts/supplychannel.tx \
-    --outputBlock /etc/hyperledger/configtx/channel-artifacts/supplychannel.block \
-    --tls --cafile /etc/hyperledger/orderer/tls/ca.crt
+    docker exec -it cli bash
+    ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+    ( creating channel si common , not for each organizations )
+
+    peer channel create \
+  -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel \
+  -f ./channel-artifacts/supplychannel.tx \
+  --outputBlock ./supplychannel.block \
+  --tls --cafile $ORDERER_CA
+
   
-11 . I have put all the command in setup.sh file 
-     docker cp setup.sh cli:/opt/gopath/src/github.com/hyperledger/fabric/peer/
-     docker exec -it cli bash
-     ping -c 1 orderer.example.com ( checking )
-     ls -l setup.sh (checking )
-     chmod +x setup.sh
-     ./setup.sh
+11 .  JOIN ALL PEERS IN THE CHANNEL :
+
+    Setting env variables  ( for 3 organizations ) - create the following files and write as in the repo
+    Petroleum-supplychain / setEnvOrg1.sh
+    Petroleum-supplychain / setEnvOrg2.sh
+    Petroleum-supplychain / setEnvOrg3.sh
+
+    ( for joining all peers in cli ) :
+
+    docker exec -it cli bash
+
+    source setEnvOrg1.sh
+    peer channel join -b ./channel-artifacts/supplychannel.block
+
+    source setEnvOrg2.sh
+    peer channel join -b ./channel-artifacts/supplychannel.block
+
+    source setEnvOrg3.sh
+    peer channel join -b ./channel-artifacts/supplychannel.block
+    
+
+    UPADTE CHANNEL FOR EACH PEER :
+
+    source setEnvOrg1.sh
+    peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org1Anchors.tx \
+  --tls --cafile $ORDERER_CA
+
+    source setEnvOrg2.sh   
+   peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org2Anchors.tx \
+  --tls --cafile $ORDERER_CA
+
+    source setEnvOrg3.sh
+    peer channel update -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel -f ./channel-artifacts/Org3Anchors.tx \
+  --tls --cafile $ORDERER_CA
+    
 
 
-     [IF VERSION ERROR DURING SETUP] : 
-      
-      docker-compose down -v
-      rm -rf crypto-config
-      rm -rf channel-artifacts
-      rm -rf system-genesis-block
-      
-      # Generate crypto material
-      cryptogen generate --config=./config/crypto-config.yaml
-
-       # Generate genesis block
-       configtxgen -profile SupplyChainGenesis -channelID system-channel -outputBlock ./channel-artifacts/genesis.block --configPath ./config
-
-       # Generate channel transaction
-       configtxgen -profile SupplyChainChannel -outputCreateChannelTx ./channel-artifacts/supplychannel.tx -channelID supplychannel --configPath ./config
-
-       # Generate anchor peer update transactions
-       configtxgen -profile SupplyChainChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1Anchors.tx -channelID supplychannel -asOrg Org1MSP --configPath ./config
-       configtxgen -profile SupplyChainChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2Anchors.tx -channelID supplychannel -asOrg Org2MSP --configPath ./config
-       configtxgen -profile SupplyChainChannel -outputAnchorPeersUpdate ./channel-artifacts/Org3Anchors.tx -channelID supplychannel -asOrg Org3MSP --configPath ./config
-
-       Then again start your network :
-       docker-compose up -d
-       continue 11.
-
-       [RESTARTING NETWORK JUST FOR THE VOLUME MOUNT TO TAKE PLACE ]
-
-       docker-compose down -v
-       docker-compose up -d
-
-
-
-
-12 . Run './setup.sh'  => once this is succcessful :
+12 . Once this is succcessful :
        => Your channel configuration chnages have been accepted by the orderer ; 
        => before update , peers join the channel and become the part of same ledger ;
        => after update , specific peers as “anchor” points for gossip communication between organizations — enabling proper cross-org peer discovery and block dissemination.
@@ -196,70 +199,39 @@ cp /mnt/c/Users/madhu/Desktop/fabric-samples/config/core.yaml /mnt/c/Users/madhu
   THIS PACKAGE (deployable chaincode artifact) gets installed on the Fabric peers
 
 
-22 . Setting env variables  ( for 3 organizations )
+       ** CHAINCODE LIFECYCLE [ INSTALL , APPROVE , COMMIT ]**   - should run all the commands in CLI container for each organizatons .
 
-Petroleum-supplychain / setEnvOrg1.sh
-Petroleum-supplychain / setEnvOrg2.sh
-Petroleum-supplychain / setEnvOrg3.sh
-
-
-       ** CHAINCODE LIFECYCLE [ INSTALL , APPROVE , COMMIT ]**   - should run all the commands in CLI container .
-
-23 .  INSTALLING :    [ inside container ]
+22 .  INSTALLING :    [ inside container ] 
 
 [ in ur core.yaml : line 276 : ensure peer : tls : enabled : true]
    
-[ .jar file isnt usable directly inside cli , so we ahve to copy the .jar file to cli , look below : ] :
+[ .jar file isnt usable directly inside cli , so we ahve to copy the .jar file to cli and also the setEnvOrg.sh files so that we can set environment for each organizations and install in each one of them, look below : ] :
 
-docker cp /mnt/c/Users/madhu/OneDrive/Desktop/Petroleum-supplychain/chaincode/petroleum/packaged-chaincode/petroleum/petroleum_1.0.tar.gz cli:/opt/
+docker cp petroleum.tar.gz cli:/opt/gopath/src/github.com/
+docker cp setEnvOrg1.sh cli:/opt/gopath/src/github.com/
+docker cp setEnvOrg2.sh cli:/opt/gopath/src/github.com/
+docker cp setEnvOrg3.sh cli:/opt/gopath/src/github.com/
+
+After copying the file into cli , enter into cli -> continue as follows :
+
 docker exec -it cli bash
-ls -l    => check all crypto materials are mounted in the cli
-then ,
-export CORE_PEER_LOCALMSPID="Org1MSP"
-export CORE_PEER_TLS_ENABLED=true
-export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
-export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
-export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
-export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+ cd /opt/gopath/src/github.com/
+ ls    => check if the chaincode is there 
 
-[check in the docker.yaml if you have all the paths written in peer,cli environment , volumes.]    ** NOTE : without proper paths -> installation of chaincode is impossible
-* write path
-*docker-compose stop cli
-*docker-compose up -d cli
+source setEnvOrg1
+peer lifecycle chaincode install petroleum.tar.gz
 
-Then try installing...
+source setEnvOrg2
+peer lifecycle chaincode install petroleum.tar.gz
 
+source setEnvOrg3
+peer lifecycle chaincode install petroleum.tar.gz
 
-Successful insatllation of chaincodes on each peer will give you :
-Package ID: petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31, 
-Label: petroleum_1
+On successful installation of chaincodes ,you will get chaincode package ID and make a note of it coz we need it for the next step ( eg:  Chaincode code package identifier: petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31 )
+And if source setEnvOrg.sh doenst work properly ..... you can just copy paste the codes from that file and run it in cli to set the env variables for each organizations.
 
 
-export CORE_PEER_LOCALMSPID=Org2MSP
-export CORE_PEER_TLS_ENABLED=true
-export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
-export CORE_PEER_ADDRESS=peer0.org2.example.com:8051
-export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
-export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
-
-Installed chaincodes on peer:
-Package ID: petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31, 
-Label: petroleum_1
-
-export CORE_PEER_LOCALMSPID=Org3MSP
-export CORE_PEER_TLS_ENABLED=true
-export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
-export CORE_PEER_ADDRESS=peer0.org3.example.com:9051
-export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
-export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
-
-Installed chaincodes on peer:
-Package ID: petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31, Label: petroleum_1
-
-
-
-
-24 . APPROVING CHAINCODE : (do for each peer)
+23 . APPROVING CHAINCODE : (do for each organizations) 
 
 To approve , the peer should join the channel :
 peer channel join -b channel-artifacts/supplychannel.block
@@ -349,19 +321,7 @@ peer lifecycle chaincode checkcommitreadiness \
   --sequence 1 \
   --output json
 
-export CORE_PEER_LOCALMSPID="Org1MSP"
-export CORE_PEER_MSPCONFIGPATH="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp"
-export CORE_PEER_ADDRESS="peer0.org1.example.com:7051"
-export CORE_PEER_TLS_ROOTCERT_FILE="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt"
-
-
-peer channel create -o orderer.example.com:7050 -c supplychannel -f ./channel-artifacts/supplychannel.tx --outputBlock ./channel-artifacts/supplychannel.block --tls --cafile $ORDERER_CA
-
-peer channel join -b ./channel-artifacts/supplychannel.block
-
-
-
-
+Then commit and query for each organization.
 
 -------------------------------------------------------------
 QUICK NEEDS IN cmd :
