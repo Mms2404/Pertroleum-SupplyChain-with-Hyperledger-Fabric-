@@ -52,6 +52,7 @@ With this Hyperledger Fabric network, you can:
 
 ## Rather than a quick start , wanna build your network , your own supplychain ? Read below :
 
+Before you build a network of your own , try the test networks provided in the fabric samples ( try to start the network and query it , then after knowing the structure you can build one )
 To learn how to bring this network to life on your machine and explore the entire flow - go to the COMMANDS.text file in this repo ( it has all the commands you should run to create this supplychain and the possible errors you can face with solution )
 
 
