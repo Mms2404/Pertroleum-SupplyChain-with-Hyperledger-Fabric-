@@ -302,16 +302,17 @@ export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/orde
 
 If you face timed out error :
 
-export CORE_PEER_EVENTS_RETRYTIMEOUT=60s
-
 peer lifecycle chaincode approveformyorg \
   --orderer orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
   --channelID supplychannel \
   --name petroleum_1 \
   --version 1.0 \
   --package-id petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31 \
   --sequence 1 \
-  --tls --cafile $ORDERER_CA
+  --tls \
+  --cafile $ORDERER_CA
+
 
 (to verify approval status)
 peer lifecycle chaincode checkcommitreadiness \
@@ -325,6 +326,5 @@ Then commit and query for each organization.
 
 -------------------------------------------------------------
 QUICK NEEDS IN cmd :
-cd /mnt/c/Users/madhu/OneDrive/Desktop/Petroleum-supplychain
 docker exec -it cli bash
 cd /opt/gopath/src/github.com/
