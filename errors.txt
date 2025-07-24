@@ -1,0 +1,56 @@
+APPROVING ERRORS :
+
+1 .
+[lifecycle] ApproveChaincodeDefinitionForOrg -> INFO 0c1 Successfully endorsed chaincode approval with name 'petroleum_1', package ID 'petroleum_1:d9338f2d47ba2461375abe3e477983b7afadba9e3458127ba8a1f32a52e73f31', on channel 'supplychannel' with definition {sequence: 1, endorsement info: (version: '1.0', plugin: 'escc', init required: true), validation info: (plugin: 'vscc', policy: '12202f4368616e6e656c2f4170706c69636174696f6e2f456e646f7273656d656e74'), collections: ()}
+[endorser] callChaincode -> INFO 0c2 finished chaincode: _lifecycle duration: 2ms channel=supplychannel txID=21f2016f
+[comm.grpc.server] 1 -> INFO 0c3 unary call completed grpc.service=protos.Endorser grpc.method=ProcessProposal grpc.peer_address=172.18.0.2:47730 grpc.code=OK grpc.call_duration=5.979877ms
+peer0.org1.example.com
+[comm.grpc.server] 1 -> INFO 0c4 streaming call completed grpc.service=protos.Deliver grpc.method=DeliverFiltered grpc.request_deadline=2025-07-17T17:48:58.941Z grpc.peer_address=172.18.0.2:47746 error="context finished before block retrieved: context deadline exceeded" grpc.code=Unknown grpc.call_duration=30.000332154s
+peer0.org1.example.com
+[peer.blocksprovider] DeliverBlocks -> INFO 0c5 Pulling next blocks from ordering service channel=supplychannel orderer-address=orderer.example.com:7050 nextBlock=1
+peer0.org1.example.com
+[peer.blocksprovider] func1 -> WARN 0c6 Encountered an error reading from deliver stream: EOF channel=supplychannel orderer-address=orderer.example.com:7050
+[peer.blocksprovider] DeliverBlocks -> WARN 0c7 Got error while attempting to receive blocks: received bad status FORBIDDEN from orderer channel=supplychannel orderer-address=orderer.example.com:7050
+[peer.blocksprovider] DeliverBlocks -> WARN 0c8 Disconnected from ordering service. Attempt to re-connect in 1m25.056s channel=supplychannel
+
+--------------------
+The logs show thathe the chaincode is approved 
+This error means your peer is not authorized to receive blocks from the ordering service. This breaks the chaincode lifecycle flow because:
+  After approving a chaincode, Fabric tries to wait for the transaction commit event from the orderer.
+  But your peer is unable to connect or is forbidden, so the CLI times out waiting.
+--------------------
+
+2. Orderer logs
+[orderer.common.msgprocessor] Apply -> WARN 179 SigFilter evaluation failed error="implicit policy evaluation failed - 0 sub-policies were satisfied, but this policy requires 1 of the 'Readers' sub-policies to be satisfied" ConsensusState=STATE_NORMAL policyName=/Channel/Readers signingIdentity="(mspid=Org1MSP subject=CN=peer0.org1.example.com,L=San Francisco,ST=California,C=US issuer=CN=ca.org1.example.com,O=org1.example.com,L=San Francisco,ST=California,C=US serialnumber=316719200514526924093515495763812292549)"
+[common.deliver] deliverBlocks -> WARN 17a [channel: supplychannel] Client 172.18.0.4:60110 is not authorized: implicit policy evaluation failed - 0 sub-policies were satisfied, but this policy requires 1 of the 'Readers' sub-policies to be satisfied: permission denied
+[comm.grpc.server] 1 -> INFO 17b streaming call completed grpc.service=orderer.AtomicBroadcast grpc.method=Deliver grpc.peer_address=172.18.0.4:60110 grpc.code=OK grpc.call_duration=764.564µs
+
+--------------------
+Your channel config (configtx.yaml) has a /Channel/Readers policy that does not include the peer MSPs (Org1MSP, Org2MSP, Org3MSP) as readers.
+But the configx.yaml seems to be fine .
+Maybe the peer's identity used to connect to the orderer does not match the policy at runtime ... so lets check the currect config block from the channel to see if three orgs are there and their policies.Readers.rule include OR('OrgXMSP.admin', 'OrgXMSP.peer', 'OrgXMSP.client')
+
+# Fetch the latest config block from the channel
+peer channel fetch config config_block.pb \
+  -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel \
+  --tls \
+  --cafile $ORDERER_CA
+
+# Decode and inspect it
+configtxlator proto_decode --input config_block.pb --type common.Block | jq '.data.data[0].payload.data.config.channel_group.groups.Application.groups'
+
+
+# Test this command also after setting the env for each org :
+
+peer channel fetch config config_block.pb -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile $ORDERER_CA -c supplychannel
+
+
+configtxlator proto_decode --input config_block.pb --type common.Block | jq '.data.data[0].payload.data.config.channel_group.policies.Readers'
+
+
+--------------------
+

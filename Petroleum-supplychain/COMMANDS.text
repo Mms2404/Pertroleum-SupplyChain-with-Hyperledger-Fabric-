@@ -65,9 +65,10 @@
   --ordererTLSHostnameOverride orderer.example.com \
   -c supplychannel \
   -f ./channel-artifacts/supplychannel.tx \
-  --outputBlock ./supplychannel.block \
+  --outputBlock ./channel-artifacts/supplychannel.block \
   --tls --cafile $ORDERER_CA
 
+  ( mv ./supplychannel.block ./channel-artifacts/ )
   
 11 .  JOIN ALL PEERS IN THE CHANNEL :
 
@@ -142,15 +143,15 @@ Submitted anchor peer updates ✅ ]
 
 chaincode/
 └── petroleum/
-|   ├── build.gradle
-|   └── src/
-|       └── main/
-|           └── java/
-|               └── org/
-|                   └── petroleum/
-|                       ├── PetroleumChaincode.java
-|                       └── Batch.java (optional)
-└── build.gradle
+   ├── build.gradle  ( copy the file from repo )
+   └── src/
+       └── main/
+           └── java/
+               └── org/
+                   └── petroleum/   ( write the chaincodes )
+                       ├── PetroleumChaincode.java  
+                       └── Batch.java (optional)
+
 
 15 . CORE CHAINCODE FUNCTIONS
 
@@ -162,7 +163,7 @@ chaincode/
 | `transferOwnership` | Changes the `owner` and/or `receiver` of a batch                  | When it’s sold/transferred to another org |
 | `getAllBatches`     | Returns all petroleum batches in the ledger                       | For auditing, analytics, or list display  |
 
-16 . create , wriet and build build.gradle 
+16 . create , write and build build.gradle 
     cd chaincode/petroleum
     gradle installDist
 
@@ -188,10 +189,12 @@ cp /mnt/c/Users/madhu/Desktop/fabric-samples/config/core.yaml /mnt/c/Users/madhu
 
 
 21 . Package usinf peer CLI 
-    peer lifecycle chaincode package petroleum.tar.gz \
-  --path packaged-chaincode/petroleum \
+   peer lifecycle chaincode package petroleum.tar.gz \
+  --path ./chaincode/petroleum/build/install/petroleum \
   --lang java \
   --label petroleum_1
+
+  ( now to check if the petroleum.tar.gz is created...run "ls" in the same cli )
 
   [ chaincode Java files (compiled) in packaged-chaincode/petroleum were bundled 
   into a .tar.gz package named petroleum.tar.gz. ]
@@ -233,41 +236,6 @@ And if source setEnvOrg.sh doenst work properly ..... you can just copy paste th
 
 23 . APPROVING CHAINCODE : (do for each organizations) 
 
-To approve , the peer should join the channel :
-peer channel join -b channel-artifacts/supplychannel.block
-
-=====================================================================
-
-Copy supplychannel.tx to cli :
-docker cp ./channel-artifacts/supplychannel.tx cli:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts/
-
-Create channel inside cli :       => creates the supplychannel.block
-
-export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
-
-peer channel create -o orderer.example.com:7050 \
-  -c supplychannel \
-  --ordererTLSHostnameOverride orderer.example.com \
-  -f ./channel-artifacts/supplychannel.tx \
-  --outputBlock ./channel-artifacts/supplychannel.block \
-  --tls --cafile $ORDERER_CA
-
-
-If you get version error => it means that you have created the channel , so you just need to fetch it : ( set the ORDERER env varibles before fetching )
-
-peer channel fetch  supplychannel.block \
-  -o orderer.example.com:7050 \
-  --ordererTLSHostnameOverride orderer.example.com \
-  -c supplychannel \
-  --tls --cafile $ORDERER_CA
-
-
-peer channel join -b ./channel-artifacts/supplychannel.block
-
-And again if you get error as LedgerID already exists , then the peer has has already joined . ( check using : peer channel list)
-Continue your next step as below :
-
-
 peer lifecycle chaincode approveformyorg \
   --orderer orderer.example.com:7050 \
   --ordererTLSHostnameOverride orderer.example.com \
@@ -300,7 +268,7 @@ export CORE_PEER_ADDRESS="peer0.org3.example.com:9051"
 export CORE_PEER_TLS_ROOTCERT_FILE="/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt"
 export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
 
-If you face timed out error :
+
 
 peer lifecycle chaincode approveformyorg \
   --orderer orderer.example.com:7050 \
@@ -314,6 +282,22 @@ peer lifecycle chaincode approveformyorg \
   --cafile $ORDERER_CA
 
 
+peer lifecycle chaincode approveformyorg \
+  --channelID supplychannel \
+  --name petroleum \
+  --version 1.0 \
+  --package-id petroleum_1:ee56a3dd5bccb0fa18bda065ef3a43ce16dc4e6caa2865216e86d9ce0bbb88e8 \
+  --sequence 1 \
+  --init-required \
+  --orderer orderer.example.com:7050 \
+  --tls \
+  --cafile $ORDERER_CA
+
+ --cafile string - Path to file containing PEM-encoded trusted certificate(s) 
+
+
+24 . CHECKING APPROVAL 
+
 (to verify approval status)
 peer lifecycle chaincode checkcommitreadiness \
   --channelID supplychannel \
@@ -322,7 +306,37 @@ peer lifecycle chaincode checkcommitreadiness \
   --sequence 1 \
   --output json
 
-Then commit and query for each organization.
+peer lifecycle chaincode checkcommitreadiness \
+  --channelID supplychannel \
+  --name petroleum \
+  --version 1.0 \
+  --sequence 1 \
+  --init-required \
+  --output json
+
+
+26 . COMMIT THE CHAINCODE 
+
+peer lifecycle chaincode commit \
+  --channelID supplychannel \
+  --name petroleum \
+  --version 1.0 \
+  --sequence 1 \
+  --init-required \
+  --signature-policy "OR('Org1MSP.peer','Org2MSP.peer','Org3MSP.peer')" \
+  --peerAddresses peer0.org1.example.com:7051 \
+  --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+  --peerAddresses peer0.org2.example.com:8051 \
+  --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
+  --peerAddresses peer0.org3.example.com:9051 \
+  --tlsRootCertFiles /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt \
+  --orderer orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  --tls \
+  --cafile /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+
+27 . TRY QUERYING ACCORDING TO THE CHAINCODE WRITTEN .
 
 -------------------------------------------------------------
 QUICK NEEDS IN cmd :

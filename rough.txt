@@ -1,0 +1,19 @@
+FIXING WHILE APPROVING :
+
+1 . peer channel list [You must see supplychannel in the list.]
+2 . peer lifecycle chaincode queryinstalled  [chaincode id]
+
+3 . Decoding the lastest config block from channel 
+   
+   peer channel fetch config config_block.pb \
+  -o orderer.example.com:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  -c supplychannel \
+  --tls \
+  --cafile $ORDERER_CA
+
+  configtxlator proto_decode --input config_block.pb --type common.Block | jq '.data.data[0].payload.data.config.channel_group.groups.Application.groups'
+
+4 . peer channel getinfo -c supplychannel [run on each peer CLI container to check whether the peer have joined the channel]
+
+5 . ls $ORDERER_CA [ run this inside the cli to check the path of orderers or peers]

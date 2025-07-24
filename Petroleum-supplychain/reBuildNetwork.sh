@@ -55,7 +55,7 @@ peer channel create \
   --ordererTLSHostnameOverride orderer.example.com \
   -c supplychannel \
   -f ./channel-artifacts/supplychannel.tx \
-  --outputBlock ./supplychannel.block \
+  --outputBlock ./channel-artifacts/supplychannel.block \
   --tls --cafile $ORDERER_CA
 echo " supplychannel.block created inside channel-artifacts"
 
